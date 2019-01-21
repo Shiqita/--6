@@ -1,0 +1,326 @@
+<html>
+<head>
+	<title>6-oe dz</title>
+	<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mootools/1.6.0/mootools-core.js"></script>
+	<style type="text/css">
+		canvas {
+			border: px solid black;
+			margin:0 0 5px 0;
+		}
+		body, html{
+			margin:5px;
+		}
+		input {
+			min-width: 110;
+			min-height: 40;
+			margin:0 0 6px 0;
+		}
+	</style>
+	<script type="text/javascript">
+		var canvas, ctx, balls, idTimer, movement, lastMode, mode=-1
+		const maxSize = 60
+		TFigure = new Class({
+			initialize: function(pX, pY, movement) {
+				this.posX = pX;
+				this.posY = pY;
+				if (mode==4)
+					this.vector = getRandomInt(4)
+			  else
+					this.vector = movement
+				this.ColorFigure='rgb('+Math.floor(Math.random()*256)+','+Math.floor(Math.random()*256)+','+Math.floor(Math.random()*256)+')'
+				this.size = 10 + Math.random() * 20
+			},
+			posX: 0,
+			posY: 0,
+			size: 0,
+			ColorFigure:"rgb(0,0,0)",
+			vector: -1,
+			colorFigure: function(ctx){
+				with (this){
+					var gradient = ctx.createRadialGradient(posX+size/8,posY-size/12, size/16, posX, posY, size);
+					gradient.addColorStop(0, '#fff');
+					gradient.addColorStop(0.85, ColorFigure);
+					return gradient;
+				}
+			},
+		})
+		TBall = new Class({
+			Extends: TFigure,
+			draw : function(ctx){
+				with (this){
+					ctx.fillStyle = colorFigure(ctx);
+					ctx.beginPath();
+					ctx.arc(posX, posY, size / 2, 0, 2*Math.PI, false);
+					ctx.closePath();
+					ctx.fill();
+				}
+			},
+		});
+		TSquare = new Class({
+			Extends: TFigure,
+			draw : function(ctx){
+				with (this){
+					ctx.fillStyle = colorFigure(ctx)
+					ctx.beginPath()
+					ctx.moveTo(posX - size / 2, posY - size / 2)
+					ctx.lineTo(posX + size / 2, posY - size / 2)
+					ctx.lineTo(posX + size / 2, posY + size / 2)
+					ctx.lineTo(posX - size / 2, posY + size / 2)
+					ctx.lineTo(posX - size / 2, posY - size / 2)
+					ctx.closePath()
+					ctx.fill()
+				}
+			},
+			colorFigure: function(ctx){
+				// цвет квадрата
+				with (this){
+					var gradient = ctx.createLinearGradient(posX - size/2, posY - size/2,
+																									posX + size/2, posY + size/2)
+					gradient.addColorStop(0, '#fff')
+					gradient.addColorStop(0.85, ColorFigure)
+					return gradient;
+				}
+			},
+		});
+		TTriangle = new Class({
+			Extends: TFigure,
+			draw : function(ctx){
+				with (this){
+					ctx.fillStyle = colorFigure(ctx)
+					ctx.beginPath()
+					ctx.moveTo(posX - size / 2, posY - size / 2)
+					ctx.lineTo(posX + size / 2, posY + size / 2)
+					ctx.lineTo(posX - size / 2, posY + size / 2)
+					ctx.lineTo(posX - size / 2, posY - size / 2)
+					ctx.closePath()
+					ctx.fill()
+				}
+			},
+		});
+		function drawBack(ctx,col1,col2,w,h){
+			// бэкграунд канваса
+			ctx.save()
+			var g = ctx.createLinearGradient(0,0,0,h)
+			g.addColorStop(1,col1)
+			g.addColorStop(0,col2)
+			ctx.fillStyle = g
+			ctx.fillRect(0,0,w,h)
+			ctx.restore()
+		}
+		function getRandomInt(max) {
+			return Math.floor(Math.random() * Math.floor(max));
+		}
+		//проверка на соприкосновения
+		function checkCollision(fig1, fig2){
+		    var collision = false
+			for (var i = 0; i < balls.length; i){
+				for (var j = 0; j < balls.length; j){
+					var ballsi = balls[i]
+							ballsj = balls[j]
+					if (i == j){
+						j++
+						continue
+					}
+					if ((balls[j] instanceof TSquare) && (balls[i] instanceof TSquare)){
+						if ((Math.abs(ballsi.posX - ballsj.posX) < ((ballsi.size + ballsj.size) / 2)) &&
+						    (Math.abs(ballsi.posY - ballsj.posY) < ((ballsi.size + ballsj.size) / 2))){
+						    collision = true;
+						}
+					} else if ((balls[j] instanceof TSquare) && !(balls[i] instanceof TSquare)){
+						var y1 = ballsj.posY - ballsj.size / 2
+						var x0 = ballsi.posX; var y0 = ballsi.posY
+						var r = ballsi.size / 2
+						var d = 4 * x0 * x0 - 4 * (x0 * x0 + y1 * y1 - 2 * y1 * y0 + y0 * y0 - r * r)
+						if (d >= 0){
+							var x = x0 + Math.sqrt(d) / 2
+							if ((x >= ballsj.posX - ballsj.size / 2) && (x <= ballsj.posX + ballsj.size / 2)){
+								collision = true;
+							}
+							var x = x0 - Math.sqrt(d) / 2
+							if ((x >= ballsj.posX - ballsj.size / 2) && (x <= ballsj.posX + ballsj.size / 2)){
+								collision = true;
+							}
+						} else {
+							var x1 = ballsj.posX - ballsj.size / 2
+							var x0 = ballsi.posX; var y0 = ballsi.posY
+							d = 4 * y0 * y0 - 4 * (y0 * y0 + x1 * x1 - 2 * x1 * x0 + x0 * x0 - r * r)
+							if (d >= 0){
+								var y = y0 + Math.sqrt(d) / 2
+								if ((y >= ballsj.posY - ballsj.size / 2) && (y <= ballsj.posY + ballsj.size / 2)){
+									collision = true
+								}
+								var y = y0 - Math.sqrt(d) / 2
+								if ((y >= ballsj.posY - ballsj.size / 2) && (y <= ballsj.posY + ballsj.size / 2)){
+									collision = true
+								}
+							} else {
+								var y1 = ballsj.posY + ballsj.size / 2
+								var x0 = ballsi.posX; var y0 = ballsi.posY
+								var d = 4 * x0 * x0 - 4 * (x0 * x0 + y1 * y1 - 2 * y1 * y0 + y0 * y0 - r * r)
+								if (d >= 0){
+									var x = x0 + Math.sqrt(d) / 2
+									if ((x >= ballsj.posX - ballsj.size / 2) && (x <= ballsj.posX + ballsj.size / 2)){
+										collision = true
+									}
+									var x = x0 - Math.sqrt(d) / 2
+									if ((x >= ballsj.posX - ballsj.size / 2) && (x <= ballsj.posX + ballsj.size / 2)){
+										collision = true
+									}
+								} else {
+									var x1 = ballsj.posX + ballsj.size / 2
+									var x0 = ballsi.posX; var y0 = ballsi.posY
+									d = 4 * y0 * y0 - 4 * (y0 * y0 + x1 * x1 - 2 * x1 * x0 + x0 * x0 - r * r)
+									if (d >= 0){
+										var y = y0 + Math.sqrt(d) / 2
+										if ((y >= ballsj.posY - ballsj.size / 2) && (y <= ballsj.posY + ballsj.size / 2)){
+											collision = true
+										}
+										var y = y0 - Math.sqrt(d) / 2
+										if ((y >= ballsj.posY - ballsj.size / 2) && (y <= ballsj.posY + ballsj.size / 2)){
+											collision = true
+										}
+									}
+								}
+							}
+						}
+					}
+					var delta=Math.sqrt(Math.abs(Math.pow((ballsi.posX-ballsj.posX),2)+Math.pow((ballsi.posY-ballsj.posY),2)))
+					if (delta < (ballsi.size + ballsj.size) / 2){
+						collision = true;
+					}
+					if (collision){
+						balls.splice(j, 1)
+						balls.splice(i, 1)
+						collision = false
+						break
+					} else {
+						ballsj.draw(ctx);
+						j++
+					}
+				}
+				i++
+			}
+		}
+		function init(){
+			canvas = document.getElementById('canvas');
+			if (canvas.getContext){
+				ctx = canvas.getContext('2d');
+				//фон
+				drawBack(ctx,'#202020','#aaa',canvas.width,canvas.height);
+				//создание первых объектов и заносим их в balls 
+				balls = [];
+				for (var i = 1; i<=10;i++){
+					var item = new TBall( 10 + Math.random() * (canvas.width-30), 10 + Math.random()*(canvas.height-30), -1);
+					item.draw(ctx);
+					balls.push(item);
+				}
+				for (var i = 1; i<=5;i++){
+					var item = new TTriangle( 10 + Math.random() * (canvas.width-30), 10 + Math.random()*(canvas.height-30), -1);
+					item.draw(ctx);
+					balls.push(item);
+				}
+				for (var i = 1; i<=5;i++){
+					var item = new TSquare( 10 + Math.random() * (canvas.width-30), 10 + Math.random()*(canvas.height-30), -1);
+					item.draw(ctx);
+					balls.push(item);
+				}
+			}
+			colTimer = setInterval("checkCollision()", 50)
+		}
+		// создаем новый объект по щелчку мыши, добавляем его в массив 
+		function goInput(event){
+			var x = event.clientX;
+			var y = event.clientY;
+			var item
+			switch (Math.random()*3|0) {        //Появление объекта по щелчку мыши
+				case 0:
+					item = new TBall(x,y,mode)
+					break
+				case 1:
+					item = new TTriangle(x,y,mode)
+					break
+				case 2:
+					item = new TSquare(x,y,mode)
+					break
+			}
+			item.draw(ctx);
+			balls.push(item);
+		}
+				function expandFigures(){
+			drawBack(ctx,'#202020','#aaa',canvas.width,canvas.height);
+			for (var i = 0; i < balls.length; i){
+				balls[i].draw(ctx);
+				balls[i].size = balls[i].size + 0.25
+				if (balls[i].size > maxSize){
+					balls.splice(i, 1.25)
+					i--
+				} else
+					i++
+			}
+		}
+		function moveBall(){
+			//движение объектов из balls
+			drawBack(ctx,'#202020','#aaa',canvas.width,canvas.height);
+			for (var i = 0; i < balls.length;i){
+				var ballsi = balls[i]
+				if (mode == 5){
+					ballsi.vector = getRandomInt(4)
+				} else if (mode != 4){
+					ballsi.vector = mode
+				}
+				switch(ballsi.vector){
+					case 0:
+						ballsi.posX += 0
+						ballsi.posY += Math.random()*2-4
+						break
+					case 1:
+						ballsi.posX += 0
+						ballsi.posY -= Math.random() * 2 - 4
+						break
+					case 2:
+						ballsi.posX += Math.random()*2-4
+						ballsi.posY += 0
+						break
+					case 3:
+						ballsi.posX -= Math.random()*2-4
+						ballsi.posY += 0
+						break
+				}
+				ballsi.draw(ctx);
+				if ((ballsi.posX > canvas.width)||(ballsi.posX < 0) ||(ballsi.posY < 0) || (ballsi.posY > canvas.height)) {
+					balls.splice(i,1)
+				}
+				else
+					i++
+			}
+		}
+		function move(movement){
+			mode = movement
+			if (mode == 4){
+				for(var i = 0; i < balls.length; i++){
+					balls[i].vector = getRandomInt(4)
+				}
+			}
+			clearInterval(idTimer)
+			idTimer = setInterval('moveBall();',50);
+			IdTimer = setInterval("expandFigures()", 50);
+		}
+	</script>
+	<style type="text/css">
+		canvas { border: 2px solid blue; }
+	</style>
+</head>
+<body onload="init();">
+	<canvas id="canvas" width="795" height="500" onclick="goInput(event);">
+	</canvas>
+	<form>
+		<input type = "button" value = "Вверх" onclick="move(0)">
+		<input type = "button" value = "Вниз" onclick="move(1)">
+		<input type = "button" value = "Влево" onclick="move(2)">
+		<input type = "button" value = "Вправо" onclick="move(3)">
+		<input type = "button" value = "Рандом" onclick="move(4)">
+		<input type = "button" value = "Хаос" onclick="move(5)">
+		<input type = "button" value = "Стоп" onclick="clearInterval(idTimer);">
+	</form>
+</body>
+</html>
